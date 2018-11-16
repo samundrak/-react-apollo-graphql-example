@@ -2,7 +2,8 @@ import React from 'react';
 import gql from 'graphql-tag';
 import { Query } from 'react-apollo';
 import Loading from '../Loading';
-import RepositoryList from '../Repository';
+import RepositoryList, { REPOSITORY_FRAGMENT } from '../Repository';
+import ErrorMessage from '../Error';
 
 const GET_CURRENT_USER = gql`
   {
@@ -13,45 +14,49 @@ const GET_CURRENT_USER = gql`
   }
 `;
 const GET_REPOSITORIES_OF_CURRENT_USER = gql`
-  {
+  query($cursor: String) {
     viewer {
-      repositories(first: 5, orderBy: { direction: DESC, field: STARGAZERS }) {
+      repositories(
+        first: 5
+        orderBy: { direction: DESC, field: STARGAZERS }
+        after: $cursor
+      ) {
         edges {
           node {
-            id
-            name
-            url
-            descriptionHTML
-            primaryLanguage {
-              name
-            }
-            owner {
-              login
-              url
-            }
-            stargazers {
-              totalCount
-            }
-            viewerHasStarred
-            watchers {
-              totalCount
-            }
-            viewerSubscription
+            ...repository
           }
+        }
+        pageInfo {
+          endCursor
+          hasNextPage
         }
       }
     }
   }
+  ${REPOSITORY_FRAGMENT}
 `;
 const Profile = () => {
   return (
-    <Query query={GET_REPOSITORIES_OF_CURRENT_USER}>
-      {({ data, loading }) => {
+    <Query
+      query={GET_REPOSITORIES_OF_CURRENT_USER}
+      notifyOnNetworkStatusChange={true}
+    >
+      {({ data, loading, error, fetchMore }) => {
+        if (error) {
+          return <ErrorMessage error={error} />;
+        }
         const { viewer } = data;
-        if (loading || !viewer) {
+        if (loading && !viewer) {
           return <Loading />;
         }
-        return <RepositoryList repositories={viewer.repositories} />;
+        return (
+          <RepositoryList
+            repositories={viewer.repositories}
+            loading={loading}
+            fetchMore={fetchMore}
+            entry={'viewer'}
+          />
+        );
       }}
     </Query>
   );
